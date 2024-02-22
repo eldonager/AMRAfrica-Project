@@ -18,6 +18,10 @@ AMR_sal %>%
   View()
 
 AMR_sal %>%
+  count(title)%>%
+  View()
+
+AMR_sal %>%
   count(author,title,doi,antimicrobial)%>%
   View()
 
@@ -29,7 +33,16 @@ AMR_sal %>%
   count(antimicrobial) %>%
   View()
 
+
+AMR_sal<- AMR_sal %>%
+  mutate(antimicrobial = 
+           ifelse(antimicrobial == "sulfisoxazole", 
+                  "Sulfisoxazole", antimicrobial))
+
 AMR_sal %>%
   count(who_classification) %>%
   View()
-View(AMR_sal)
+
+###writing the new csv file
+write.table(AMR_sal, file = "AMR_clean.csv", row.names = FALSE,
+            sep = ",")
