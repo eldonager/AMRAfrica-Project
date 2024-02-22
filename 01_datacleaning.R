@@ -18,9 +18,18 @@ AMR_sal %>%
   View()
 
 AMR_sal %>%
-  count(author,title,doi)%>%
+  count(author,title,doi,antimicrobial)%>%
   View()
 
 AMR_sal %>%
   count(antibiotic_class) %>%
   View()
+
+AMR_sal %>%
+  count(antimicrobial) %>%
+  View()
+
+AMR_sal %>%
+  count(who_classification) %>%
+  View()
+View(AMR_sal)
