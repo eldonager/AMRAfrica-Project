@@ -41,6 +41,9 @@ AMR_clean<- AMR_clean %>%
   #restrict analysis to bacteria-drug pairings where NIsolates > =10
   SalMeandf = SalMeandf[which(SalMeandf$NIsolates >= 10),]
   
+  hist(SalMeandf$Mean, main = "Distribution of Mean Prevalence", xlab = "Mean Prevalence")
+  
+  
   # Compute the 95% CI of proportion where x = p_hat and y = n two tailed z = 1.96
   CI.function <- function(x,y) {
     x + c(-1.96,1.96)*sqrt(x*(1-x)/y)}
