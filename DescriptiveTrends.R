@@ -202,16 +202,15 @@ RMSE_mean = rmse(data1$MeanRes,myPreds_sal[[1]]$fit)
 
 p1 =  ggplot(data = data1) +
   geom_point(mapping = aes(x=Year, y = MeanRes),
-             shape=21, fill="#3182BD", col="black", alpha=0.25, size=3, stroke=0.4, position = position_jitter(width = 0.2, height = 0)) +
+             shape=21, fill="lightblue", col="black", alpha=0.25, size=3, stroke=0.4, position = position_jitter(width = 0.2, height = 0)) +
   geom_boxplot(mapping = aes(x=Year, y = MeanRes, group = Year), outlier.shape = NA, fill="grey 70", col="black", alpha=0.2) +
   geom_ribbon(mapping = aes(x = Year,
                             ymin = myPreds_sal[[1]]$fit - 1.96*myPreds_sal[[1]]$se.fit,
                             ymax = myPreds_sal[[1]]$fit + 1.96*myPreds_sal[[1]]$se.fit),
-              alpha = 0.3, fill="#FD9825") +
-  geom_line(mapping = aes(x = Year, y = myPreds_sal[[1]]$fit), size=0.75, col="darkred", linetype = "dotted") +
-  xlab(label = "") +
-  scale_x_continuous(breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016,2018))+
+              alpha = 0.3, fill="darkorange") +
+  geom_line(mapping = aes(x = Year, y = myPreds_sal[[1]]$fit), size=0.75, col="blue", linetype = "dashed") +
+  xlab(label = "Year") +ylab(label = "Percent resistance")+
+  scale_x_continuous(breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016,2018, 2020,2022))+
   scale_y_continuous(n.breaks = 6) +
-  theme_bw() +
-  tt_theme
-
+  theme_pubr()
+p1
