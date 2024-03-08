@@ -1,0 +1,213 @@
+---
+title: "Spatial Analysis"
+format: revealjs
+editor: visual
+---
+
+## Spatial autocorrelation
+
+## 
+
+Moran's
+
+## Code
+
+When you click the **Render** button a presentation will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+
+library(rnaturalearth) 
+library(mapview) 
+library (tidyverse)
+library(janitor)
+library(ggpubr)
+library(wesanderson)
+library(RColorBrewer)
+library("ggsci")
+library(tmap) 
+library(sf)
+AMR_clean <- read.csv("AMR_clean.csv")
+
+
+
+colnames(AMR_clean)
+
+
+AMR_clean<- AMR_clean %>%
+  dplyr::select(doi,country,region, iso_3, y_coordinate,x_coordinate,sampling_start_year,
+                sampling_end_year, species, pathogen,sal_prevalence,
+                antimicrobial_compound,antibiotic_class,
+                who_classification, no_isolate,no_isolates_resistant, 
+                no_isolates_intermediate,no_isolates_susceptible,mdr_percentage)                                      
+
+
+AMR_clean<- AMR_clean %>%
+  dplyr::mutate(no_isolates_susceptible=no_isolate-no_isolates_resistant)
+
+AMR_clean<- AMR_clean %>% 
+  dplyr::select(-no_isolates_intermediate)
+
+
+##Pooled prevalence for salmonella by antibiotic compounds- bargraphs
+#aggregate all resistant isolates and all NIsolates by speciesag, compound and region
+SalRes = aggregate(no_isolates_resistant ~  antimicrobial_compound+species+iso_3 , data = AMR_clean, FUN = sum)
+SalAll = aggregate(no_isolate ~  antimicrobial_compound+species+iso_3 , data = AMR_clean, FUN = sum)
+
+#and divide ResIso/NIsolates to return true mean
+SalMean = round((SalRes$no_isolates_resistant /SalAll$no_isolate)*100, digits = 0)
+SalMeandf = as.data.frame(cbind(SalRes$antimicrobial_compound,  SalRes$species, SalMean, SalAll$no_isolate, SalRes$iso_3))
+colnames(SalMeandf) = c("antimicrobial_compound", "Species","Mean","NIsolates", "iso_3")
+SalMeandf$Mean = as.numeric(as.character(SalMeandf$Mean))
+SalMeandf$NIsolates = as.numeric(as.character(SalMeandf$NIsolates))
+
+
+
+
+SalMeandf$Mean <- as.numeric(as.character(SalMeandf$Mean))
+
+
+
+
+
+df1 <- SalMeandf %>%
+  group_by(Species) %>%
+  select(
+    "iso_3",
+    "antimicrobial_compound",
+    "Mean",
+    "NIsolates")
+
+
+
+df1$Mean <- round(df1$Mean, digits = 0)
+
+df1<- df1[which(df1$Mean>= 1),]
+
+
+
+
+
+df2 <-aggregate(Mean~iso_3, data = df1, FUN=mean)
+
+
+sf_use_s2(FALSE)
+tmap_options(check.and.fix = TRUE)
+
+
+colnames(df2)[which(colnames(df2) == 'iso_3')] <- 'iso3'
+
+map <- ne_countries(continent = "Africa",returnclass = "sf") %>%
+  select(name, iso2 = iso_a2, iso3 = iso_a3, geometry)
+
+df3 <- map %>% left_join(
+  df2 %>%
+    select( iso3, Mean),
+  by = c("iso3")
+)
+
+
+p1 <- tmap::tm_shape(df3) +
+  tmap::tm_polygons(col = "Mean", n = 6, title = "Resistance %",
+                    palette = "inferno")+
+  tm_text("iso3", size = 0.7)
+p1
+
+p1 <- tmap::tm_shape(df3) +
+  tmap::tm_polygons(col = "Mean", n = 6, title = "Resistance %", palette = "inferno") +
+  tm_text("iso3", size = 0.7) +
+  #tmap::tm_scale_bar(position = c("left", "bottom")) +  # Add scale bar
+  tmap::tm_compass(type = "8star", position = c("right", "top"))  # Add compass
+
+p1
+
+######Spatial autocorellation using Global Moran's I test###########
+
+# Neighbors 
+library(spdep) 
+
+
+df3_complete <- df3[complete.cases(df3$Mean), ]
+
+nb <- poly2nb(df3_complete, queen = TRUE) # queen shares point or border
+
+
+nbw <- nb2listw(nb, style = "W", zero.policy = TRUE)
+
+# Global Moran's I 
+gmoran <- moran.test(df3_complete$Mean, nbw, alternative = "greater") 
+gmoran
+
+gmoran[["estimate"]][["Moran I statistic"]] # Moran's I
+ gmoran[["statistic"]] # z-score 
+ gmoran[["p.value"]] # p-value
+
+ ##We observe the p-value obtained is higher than the significance level 0.05. 
+ ##Then, we fail to reject the null hypothesis and conclude there is evidence for negative spatial autocorrelation.
+ 
+ ##Monte carlo approach
+ gmoranMC <- moran.mc(df3_complete$Mean, nbw, nsim = 999) 
+ 
+ #Histogram of the Moran’s I values for each of the simulated patterns in the Monte Carlo randomization approach
+ hist(gmoranMC$res) 
+ abline(v=gmoranMC$statistic, col = "red")
+ gmoranMC
+ 
+ ##Moran’s I scatterplot showing the observations against its spatially lagged values.
+ moran.plot(df3_complete$Mean, nbw)
+ 
+ #Local moran stats
+ 
+ lmoran <- localmoran(df3_complete$Mean, nbw, alternative = "greater")
+lmoran 
+
+head(lmoran)
+
+library(tmap)
+tmap_mode("plot")
+df3_complete$lmI <- lmoran[, "Ii"] # local Moran's I
+df3_complete$lmZ <- lmoran[, "Z.Ii"] # z-scores # p-values corresponding to alternative greater 
+df3_complete$lmp <- lmoran[, "Pr(z > E(Ii))"]
+
+
+p1 <- tm_shape(df3_complete) + 
+  tm_polygons(col = "Mean", title = "Percentage resistance", style = "quantile") + 
+  tm_layout(legend.outside = TRUE)
+
+
+p2 <- tm_shape(df3_complete) + 
+  tm_polygons(col = "lmI", title = "Local Moran's I", style = "quantile") + 
+  tm_layout(legend.outside = TRUE)
+
+
+
+p3 <- tm_shape(df3_complete) +
+  tm_polygons(col = "lmZ", title = "Z-score", breaks = c(-Inf, 1.65, Inf), palette = "Greens") +
+  tm_layout(legend.outside = TRUE)
+
+
+
+p4 <- tm_shape(df3_complete) + 
+  tm_polygons(col = "lmp", title = "p-value", breaks = c(-Inf, 0.05, Inf)) + 
+  tm_layout(legend.outside = TRUE)
+
+
+
+tmap_arrange(p1, p2, p3, p4)
+
+
+
+
+tm3<-tm_shape(df3_complete) +
+  tm_polygons(col = "lmZ", title = "Local Moran's I", 
+              style = "fixed", breaks = c(-Inf, -1.96, 1.96, Inf), 
+              labels = c("Negative SAC", "No SAC", "Positive SAC"),
+              palette = c("blue", "white", "red")) +
+  tm_layout(legend.outside = TRUE)
+
+
+
+
+tm3
+
+
+```

@@ -1,57 +1,95 @@
 
-main_data <- read_csv("mean.data.csv")
+library (tidyverse)
+library(janitor)
+library(ggpubr)
+library(wesanderson)
+library(RColorBrewer)
+library("ggsci")
+
+AMR_clean <- read.csv("AMR_clean.csv")
+
+
+
+colnames(AMR_clean)
+
+
+AMR_clean<- AMR_clean %>%
+  dplyr::select(doi,country,region, iso_3, y_coordinate,x_coordinate,sampling_start_year,
+                sampling_end_year, species, pathogen,sal_prevalence,
+                antimicrobial_compound,antibiotic_class,
+                who_classification, no_isolate,no_isolates_resistant, 
+                no_isolates_intermediate,no_isolates_susceptible,mdr_percentage)                                      
+
+
+AMR_clean<- AMR_clean %>%
+  dplyr::mutate(no_isolates_susceptible=no_isolate-no_isolates_resistant)
+
+AMR_clean<- AMR_clean %>% 
+  dplyr::select(-no_isolates_intermediate)
+
+
+##Pooled prevalence for salmonella by antibiotic compounds- bargraphs
+#aggregate all resistant isolates and all NIsolates by speciesag, compound and region
+SalRes = aggregate(no_isolates_resistant ~  antimicrobial_compound+species+country , data = AMR_clean, FUN = sum)
+SalAll = aggregate(no_isolate ~  antimicrobial_compound+species+country , data = AMR_clean, FUN = sum)
+
+#and divide ResIso/NIsolates to return true mean
+SalMean = round((SalRes$no_isolates_resistant /SalAll$no_isolate)*100, digits = 0)
+SalMeandf = as.data.frame(cbind(SalRes$antimicrobial_compound,  SalRes$species, SalMean, SalAll$no_isolate, SalRes$country))
+colnames(SalMeandf) = c("antimicrobial_compound", "Species","Mean","NIsolates", "country")
+SalMeandf$Mean = as.numeric(as.character(SalMeandf$Mean))
+SalMeandf$NIsolates = as.numeric(as.character(SalMeandf$NIsolates))
+
+
+
+
+SalMeandf$Mean <- as.numeric(as.character(SalMeandf$Mean))
+
+
+
+
+
+df1 <- SalMeandf %>%
+  group_by(Species) %>%
+  select(
+         "country",
+         "antimicrobial_compound",
+         "Mean",
+         "NIsolates")
+
+
+
+
+
+
+
+df2 <-aggregate(Mean~Species+antimicrobial_compound, data = df1, FUN=mean)
+
+
 
 #changing percentage resistance into numeric class and rounding off  
-main_data$percent_resistant <- as.numeric(as.character
-                                          (main_data$percent_resistant))
+df2$Mean <- as.numeric(as.character
+                                      (df2$Mean))
 
-main_data$percent_resistant <- round(main_data$percent_resistant, digits = 0)
+df2$Mean <- round(df2$Mean, digits = 0)
 
-
-data2 <- main_data %>%
-  group_by(host) %>%
-  select("doi",
-         "farm_type",
-         "host",
-         "percent_resistant")
+df2<- df2[which(df2$Mean>= 1),]
 
 
 
 
 
-
-
-data3 <-aggregate(percent_resistant~doi+farm_type+host, data2, mean)
-
-
-
-#changing percentage resistance into numeric class and rounding off  
-data3$percent_resistant <- as.numeric(as.character
-                                      (data3$percent_resistant))
-
-data3$percent_resistant <- round(data3$percent_resistant, digits = 0)
-
-data3<- data3[which(data3$percent_resistant>= 1),]
-
-#subseting organic farm data
-Organic.data <- data3 %>%
-  filter(farm_type == "Organic")
-
-
-
-
-
-
-org.plot<-ggplot(Organic.data, aes(x = host, y = percent_resistant, fill = host))+ 
+species_plot<-ggplot(df2, aes(x = Species, y = Mean, fill = Species))+ 
   geom_boxplot(
     width = .15, 
     outlier.shape = NA
   ) +
   
-  scale_fill_manual(values = wes_palette( "Darjeeling1", n=5))+
+  scale_fill_brewer(palette = "Paired") +
+  theme(legend.position = "top")+
   coord_cartesian(xlim = c(1.2, NA), clip = "off")
 
-org.plot<- org.plot+
+pp1<- species_plot+
   theme_pubr(
     base_size = 17,
     base_family = "",
@@ -61,14 +99,12 @@ org.plot<- org.plot+
     x.text.angle = 0
   )
 
-org.plot<- org.plot+labs(x = "Host", fill = "Host")
-org.plot<- org.plot+scale_color_discrete(name = "Host")
-##Changing x axis label order
-org.plot <- org.plot + scale_x_discrete(name ="Host", 
-                                        limits=c("Cattle","Chicken","Pigs", "Turkey", "Environment"))
-
-org.1 <-org.plot+labs(x = "Host", y = "Percent resistance", 
-                      title = "Organic farms")+
+pp2 <- pp1 + labs(x = "Host", fill = "Host") +
+  scale_color_discrete(name = "Host") +
+  scale_x_discrete(name = "Host", 
+                   limits = c("Cattle", "Chicken", "Goats", "Pigs", "Sheep", "Turkey", "Environment")) +
+  labs(x = "Host", y = "Percent resistance") +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
   theme(legend.position = "none")
+pp2
 
-org.1 <-ggpar(org.1,ylim = c(0, 100))
